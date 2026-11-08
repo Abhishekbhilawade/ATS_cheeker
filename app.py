@@ -10,7 +10,7 @@ from utils.ats_analyzer import analyze_resume, JOB_ROLES
 # --------------------------------------------------
 
 st.set_page_config(
-    page_title="ATS Resume Checker",
+    page_title="Advanced ATS Resume Checker",
     page_icon="📄",
     layout="wide"
 )
@@ -31,33 +31,46 @@ if "uploaded_file_name" not in st.session_state:
 
 
 # --------------------------------------------------
-# APPLICATION TITLE
+# APPLICATION HEADER
 # --------------------------------------------------
 
-st.title("📄 ATS Resume Checker")
+st.title("📄 Advanced ATS Resume Checker")
 
-st.write(
-    "Upload your resume, select your target job role, "
-    "and check how well your resume matches that role."
+st.markdown(
+    "Analyze your resume against 40+ IT job roles, "
+    "identify skill gaps, and get suggestions to improve it."
 )
 
 st.divider()
 
 
 # --------------------------------------------------
-# RESUME UPLOAD AND JOB ROLE
+# SIDEBAR
 # --------------------------------------------------
 
-st.subheader("1. Upload Your Resume")
+st.sidebar.title("⚙️ Resume Settings")
 
-uploaded_file = st.file_uploader(
-    "Choose your resume (PDF or DOCX)",
-    type=["pdf", "docx"]
-)
-
-selected_role = st.selectbox(
+selected_role = st.sidebar.selectbox(
     "Select your target job role",
     options=list(JOB_ROLES.keys())
+)
+
+st.sidebar.info(
+    "Choose the job role you want to target. "
+    "The application will compare your resume with "
+    "the selected role's skills."
+)
+
+
+# --------------------------------------------------
+# RESUME UPLOAD
+# --------------------------------------------------
+
+st.header("1. Upload Your Resume")
+
+uploaded_file = st.file_uploader(
+    "Upload your resume (PDF or DOCX)",
+    type=["pdf", "docx"]
 )
 
 
@@ -67,91 +80,90 @@ selected_role = st.selectbox(
 
 if uploaded_file is not None:
 
-    # Reset previous results when a different file is uploaded
     if st.session_state.uploaded_file_name != uploaded_file.name:
+
         st.session_state.result = None
         st.session_state.resume_text = None
+
         st.session_state.uploaded_file_name = uploaded_file.name
 
     try:
+
         resume_text = extract_resume_text(uploaded_file)
 
         st.session_state.resume_text = resume_text
 
         if not resume_text.strip():
+
             st.warning(
-                "No readable text was found in this resume. "
-                "If it is a scanned PDF, it may need OCR processing."
+                "No readable text found. "
+                "If this is a scanned PDF, OCR may be required."
             )
 
     except Exception as error:
-        st.error(f"Could not read the resume: {error}")
+
+        st.error(f"Resume extraction failed: {error}")
+
         st.session_state.resume_text = None
 
 else:
+
     st.session_state.resume_text = None
     st.session_state.result = None
     st.session_state.uploaded_file_name = None
-
-
-st.divider()
 
 
 # --------------------------------------------------
 # RESUME PREVIEW
 # --------------------------------------------------
 
-st.subheader("2. Resume Preview")
+st.divider()
+
+st.header("2. Resume Preview")
 
 left_col, right_col = st.columns(2, gap="large")
 
 
 with left_col:
 
-    st.markdown("### Uploaded Resume")
+    st.subheader("Uploaded Resume")
 
     if uploaded_file is not None:
 
         st.success(f"Uploaded: {uploaded_file.name}")
 
-        st.caption(
-            "Your resume has been uploaded successfully."
-        )
-
         if st.session_state.resume_text:
-            st.write(
-                f"Extracted text: "
-                f"{len(st.session_state.resume_text)} characters"
+
+            st.metric(
+                "Extracted Characters",
+                len(st.session_state.resume_text)
             )
 
     else:
-        st.info("Upload a PDF or DOCX resume to continue.")
+
+        st.info("Upload your resume to continue.")
 
 
 with right_col:
 
-    st.markdown("### CV Preview")
+    st.subheader("CV Preview")
 
     if uploaded_file is not None:
 
         if uploaded_file.name.lower().endswith(".pdf"):
 
             try:
-                pdf_bytes = uploaded_file.getvalue()
 
                 st.pdf(
-                    pdf_bytes,
-                    height=650
+                    uploaded_file.getvalue(),
+                    height=600
                 )
 
             except Exception as error:
-                st.error(
-                    f"Unable to display PDF preview: {error}"
-                )
 
-        elif uploaded_file.name.lower().endswith(".docx"):
+                st.error(f"PDF preview error: {error}")
 
-            st.info("DOCX Resume Preview")
+        else:
 
             if st.session_state.resume_text:
 
@@ -163,17 +175,17 @@ with right_col:
                 )
 
     else:
+
         st.info("Your resume preview will appear here.")
 
 
+# --------------------------------------------------
+# ANALYZE RESUME
+# --------------------------------------------------
+
 st.divider()
 
-
-# --------------------------------------------------
-# RESUME ANALYSIS
-# --------------------------------------------------
-
-st.subheader("3. Analyze Your Resume")
+st.header("3. Analyze Your Resume")
 
 if uploaded_file is not None and st.session_state.resume_text:
 
@@ -187,27 +199,23 @@ if uploaded_file is not None and st.session_state.resume_text:
 
             with st.spinner("Analyzing your resume..."):
 
-                result = analyze_resume(
+                st.session_state.result = analyze_resume(
                     st.session_state.resume_text,
                     selected_role
                 )
-
-                st.session_state.result = result
 
         except Exception as error:
 
             st.error(f"Analysis failed: {error}")
 
+
 else:
 
-    st.info(
-        "Please upload a resume containing readable text "
-        "before starting the analysis."
-    )
+    st.info("Please upload a resume with readable text.")
 
 
 # --------------------------------------------------
-# DISPLAY ANALYSIS RESULTS
+# DISPLAY RESULTS
 # --------------------------------------------------
 
 if st.session_state.result is not None:
@@ -222,47 +230,44 @@ if st.session_state.result is not None:
         f"**Selected Job Role:** {result['role']}"
     )
 
-    # ATS SCORE
+    # SCORE CARDS
+
     score_col, skill_col, similarity_col = st.columns(3)
 
     with score_col:
+
         st.metric(
             "Estimated ATS Score",
             f"{result['score']}%"
         )
 
     with skill_col:
+
         st.metric(
             "Skill Match",
             f"{result['skill_score']}%"
         )
 
     with similarity_col:
+
         st.metric(
             "Text Similarity",
             f"{result['similarity']}%"
         )
 
-    # SCORE PROGRESS BAR
     st.subheader("Overall Resume Match")
 
     st.progress(
         min(max(result["score"] / 100, 0.0), 1.0)
     )
 
-    if result["score"] >= 75:
-        st.success("Good match! Your resume covers many of the selected role's requirements.")
-
-    elif result["score"] >= 50:
-        st.warning("Moderate match. Consider improving your resume with relevant skills and experience.")
-
-    else:
-        st.error("Low match. Consider adding relevant skills and projects where you have genuine experience.")
+    # MATCHED AND MISSING SKILLS
 
     st.divider()
 
-    # MATCHED AND MISSING SKILLS
-    matched_col, missing_col = st.columns(2, gap="large")
+    st.header("4. Skill Gap Analysis")
+
+    matched_col, missing_col = st.columns(2)
 
     with matched_col:
 
@@ -271,10 +276,12 @@ if st.session_state.result is not None:
         if result["matched_skills"]:
 
             for skill in result["matched_skills"]:
+
                 st.success(skill)
 
         else:
-            st.info("No required skills were detected.")
+
+            st.info("No matching skills detected.")
 
     with missing_col:
 
@@ -283,25 +290,63 @@ if st.session_state.result is not None:
         if result["missing_skills"]:
 
             for skill in result["missing_skills"]:
+
                 st.warning(skill)
 
         else:
-            st.success("All listed role skills were detected!")
+
+            st.success("All listed skills were detected!")
+
+    # KEYWORD SUGGESTIONS
 
     st.divider()
 
-    # ALL REQUIRED SKILLS
-    with st.expander("View all required skills"):
+    st.header("5. Keyword Suggestions")
+
+    st.write(
+        "These are relevant skills that you could consider "
+        "including if you genuinely have the knowledge or experience."
+    )
+
+    if result["keyword_suggestions"]:
+
+        for suggestion in result["keyword_suggestions"]:
+
+            st.info(f"💡 {suggestion}")
+
+    else:
+
+        st.success("No additional keyword suggestions.")
+
+    # RESUME IMPROVEMENT TIPS
+
+    st.divider()
+
+    st.header("6. Resume Improvement Tips")
+
+    for index, tip in enumerate(
+        result["improvement_tips"],
+        start=1
+    ):
+
+        st.write(f"**{index}.** {tip}")
+
+    # REQUIRED SKILLS
+
+    with st.expander("View all required skills for this role"):
 
         st.write(
             ", ".join(result["required_skills"])
         )
 
     # DISCLAIMER
+
+    st.divider()
+
     st.caption(
-        "Note: This is an educational resume-matching estimate, "
-        "not an official ATS score. Results depend on the "
-        "skills and role descriptions configured in this project."
+        "Disclaimer: This application provides an educational "
+        "resume-matching estimate, not an official ATS score. "
+        "Always include only skills and experience that you genuinely possess."
     )
 
 
@@ -312,5 +357,5 @@ if st.session_state.result is not None:
 st.divider()
 
 st.caption(
-    "ATS Resume Checker | Built with Python and Streamlit"
+    "Advanced ATS Resume Checker | Python + Streamlit + Scikit-learn"
 )
